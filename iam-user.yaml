@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Template for creating IAM user for Terraform with Administrator Access and storing Access Key in Secrets Manager
+  Validate: aws cloudformation validate-template --template-body file://terraform_user.yml
+  Deploy: aws cloudformation create-stack --region sa-east-1 --stack-name Terraform-User --enable-termination-protection --template-body file://terraform_user.yml --parameters ParameterKey=TerraformUserName,ParameterValue=terraform ParameterKey=TerraformSecretName,ParameterValue=terraform/access-key
+
+Parameters:
+  TerraformUserName:
+    Type: String
+    Default: terraform
+    Description: The name of the IAM user to be created
+
+  TerraformSecretName:
+    Type: String
+    Default: terraform/access-key
+    Description: The name of the secret to store the access key in Secrets Manager
+
+Resources:
+  TerraformUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Ref TerraformUserName
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  TerraformUserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref TerraformUser
+
+  TerraformAccessKeySecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Ref TerraformSecretName
+      Description: "Access Key for Terraform user"
+      SecretString: !Sub '{"AccessKeyId":"${TerraformUserAccessKey}","SecretAccessKey":"${TerraformUserAccessKey.SecretAccessKey}"}'
+      Tags:
+        - Key: Name
+          Value: !Ref TerraformSecretName
+
+Outputs:
+  AccessKeySecretArn:
+    Description: "ARN of the secret storing the Terraform user access key"
+    Value: !Ref TerraformAccessKeySecret
+    Export:
+      Name: AccessKeySecretArn
